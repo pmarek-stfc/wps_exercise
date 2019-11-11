@@ -31,16 +31,18 @@ def get_years(dataset):
 
 
 def couple_subset(files):
-    """ return list of tuples of all subsets of length couple """
+    """ Returns all possible couples of files """
     couple = 2
     return list(combinations(files, couple))
 
 
 def open_mfdatasets(files_to_open):
     """
+    Test if a couple of data sets can be aggregated together
+    and add them into a set if so
 
     :param files_to_open: found netCDF4 files
-    :return: set of correct datasets
+    :return: set of correct data sets
     """
     correct_dataset_couples = []
     for combination in files_to_open:
