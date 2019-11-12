@@ -55,5 +55,5 @@ def open_mfdatasets(files_to_open):
     correct_dataset = set()
     for elements in correct_dataset_couples:
         correct_dataset.update(elements)
-    return correct_dataset
+    return xr.open_mfdataset(correct_dataset)
 
