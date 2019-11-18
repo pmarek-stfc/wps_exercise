@@ -42,7 +42,7 @@ def open_mfdatasets(files_to_open):
     and add them into a set if so
 
     :param files_to_open: found netCDF4 files
-    :return: set of correct data sets
+    :return: opened netCDF data sets using `open_mfdataset`
     """
     correct_dataset_couples = []
     for combination in files_to_open:
