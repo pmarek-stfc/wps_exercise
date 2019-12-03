@@ -3,11 +3,13 @@ from pywps import ComplexInput, ComplexOutput
 from pywps.app.Common import Metadata
 from pywps import Format, FORMATS
 from pywps.exceptions import InvalidParameterValue
-import xarray as xr
-
+from wps_exercise.processes.functions import open_mfdatasets, get_years
 
 import glob
+import time
 import os
+import cftime
+from pathlib import Path
 
 import logging
 LOGGER = logging.getLogger("PYWPS")
@@ -18,19 +20,19 @@ class Exercise(Process):
     def __init__(self):
         inputs = [
             LiteralInput('min_lon', 'Minimum longitude',
-                         data_type='float',
+                         data_type='integer',
                          default=-180,
                          min_occurs=1),
             LiteralInput('max_lon', 'Maximum longitude',
-                         data_type='float',
+                         data_type='integer',
                          default=180,
                          min_occurs=1),
             LiteralInput('min_lat', 'Minimum latitude',
-                         data_type='float',
+                         data_type='integer',
                          default=-90,
                          min_occurs=1),
             LiteralInput('max_lat', 'Maximum latitude',
-                         data_type='float',
+                         data_type='integer',
                          default=90,
                          min_occurs=1),
             LiteralInput('variable', 'Variable',
@@ -80,21 +82,39 @@ class Exercise(Process):
     def _handler(request, response):
         model = request.inputs['model'][0].data
         variable = request.inputs['variable'][0].data
-        nc_files_path = f'badc/cmip5/data/cmip5/output1/MOHC/{model}/rcp45/mon/atmos/Amon/r1i1p1/latest/{variable}/'
-        file_path = os.path.join(os.environ.get('HOME'), nc_files_path)
-        files = glob.glob(file_path + '*.nc')
-        ds = xr.open_mfdataset(files)
-
 
         # Throw manually with temporary bbox solution
-        if request.inputs['min_lon'][0].data < -180:
-            raise InvalidParameterValue('Minimum longitude input cannot be below -180')
-        if request.inputs['max_lon'][0].data > 180:
-            raise InvalidParameterValue('Maximum longitude input cannot be above 180')
+        if request.inputs['min_lon'][0].data < 0:
+            raise InvalidParameterValue('Minimum longitude input cannot be below 0')
+        if request.inputs['max_lon'][0].data > 360:
+            raise InvalidParameterValue('Maximum longitude input cannot be above 360')
         if request.inputs['min_lat'][0].data < -90:
             raise InvalidParameterValue('Minimum latitude input cannot be below -90')
         if request.inputs['max_lat'][0].data > 90:
             raise InvalidParameterValue('Minimum latitude input cannot be above 90')
 
+        d1 = cftime.Datetime360Day(2010, 1, 1)
+        d2 = cftime.Datetime360Day(2020, 1, 1)
 
+        nc_files_path = f'xarray'
+        files_path = os.path.join(str(Path.home()), nc_files_path)
+        files = glob.glob(files_path + '/tas*.nc')
+
+        #response.update_status("Reading through files", 10)
+        files_to_open = get_years(files)
+        new_dataset = open_mfdatasets(files_to_open)
+        #response.update_status("Calculating temporal average", 50)
+
+        sliced_dataset = new_dataset.sel(time=slice(d1, d2), lon=slice(request.inputs['min_lon'][0].data,
+                                                                    request.inputs['max_lon'][0].data),
+                                                            lat=slice(request.inputs['min_lat'][0].data,
+                                                                    request.inputs['max_lat'][0].data))
+        # calculate temporal average across the time axis only
+        mean_array = sliced_dataset.mean(dim='time')
+        print(mean_array)
+        response.update_status("Writing results to a new NetCDF4 file", 50)
+        # result_nc_file = mean_array.to_netcdf('results.nc')
+
+        response.outputs['output'].nc_file = mean_array.to_netcdf('resultsssss.nc')
+        response.update_status("Done.", 100)
         return response
